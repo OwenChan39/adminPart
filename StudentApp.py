@@ -673,7 +673,7 @@ def adminLecturer():
     return render_template("adminLecturer.html", lecturers=enumerated_lecturers, number_of_lecturers=number_of_lecturers)
 
 @app.route('/adminDeleteLecturer/<string:lecturer_id>', methods=["GET"])
-def admin_delete_student(lecturer_id):
+def admin_delete_lecturer(lecturer_id):
     # Implement code to delete the lecturer with the given lecturer_id from the database or list
     # You can use a database ORM or manipulate the list directly
     cursor = db_conn.cursor()
