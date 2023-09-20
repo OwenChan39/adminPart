@@ -5,7 +5,6 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from config import *
 from werkzeug.utils import secure_filename
-import bcrypt
 
 app = Flask(__name__, static_folder="static")
 app.secret_key = "123456"
@@ -179,22 +178,35 @@ def company_signup():
 
     return render_template("company_signup.html")
 
+# Function to encrypt a string
+def encrypt(text, key):
+    encrypted_text = ""
+    for char in text:
+        encrypted_char = chr(ord(char) ^ key)
+        encrypted_text += encrypted_char
+    return encrypted_text
+
+# Function to decrypt an encrypted string
+def decrypt(encrypted_text, key):
+    decrypted_text = ""
+    for char in encrypted_text:
+        decrypted_char = chr(ord(char) ^ key)
+        decrypted_text += decrypted_char
+    return decrypted_text
 
 @app.route("/admin_signup", methods=["GET", "POST"])
 def admin_signup():
     if request.method == "POST":
+        encrypt_key = 42
         admin_name = request.form["admin_name"]
         admin_username = request.form["admin_username"]
-        admin_password = request.form["admin_password"]
-
-        # Hash the password
-        hashed_password = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
+        admin_password = encrypt(request.form["admin_password"], encrypt_key)
 
         insert_sql = "INSERT INTO Admin (admin_name, admin_username, admin_password) VALUES (%s, %s, %s)"
         cursor = db_conn.cursor()
 
         try:
-            cursor.execute(insert_sql, (admin_name, admin_username, hashed_password))
+            cursor.execute(insert_sql, (admin_name, admin_username, admin_password))
             db_conn.commit()
 
             return render_template("signup_success.html", name=admin_name)
@@ -245,18 +257,24 @@ def login():
                 return redirect(url_for("lecturer_dashboard"))
             
         elif role == "admin":
+            encryption_key = 42
             cursor.execute(
-                "SELECT * FROM Admin WHERE admin_username = %s",
+                "SELECT admin_username, admin_password FROM Admin WHERE admin_username = %s",
                 (username,)
             )
-            admin = cursor.fetchone()
-            
-            if admin:
-                hashed_password_from_db = admin["admin_password"]  # Assuming the column name is "admin_password"
+            result = cursor.fetchone()
 
-                # Check if the entered password matches the hashed password from the database
-                if bcrypt.checkpw(password.encode('utf-8'), hashed_password_from_db.encode('utf-8')):
-                    # Passwords match, so it's a successful login
+            if result:
+                stored_encrypted_password = result[1]
+
+                # Decrypt the stored encrypted password
+                stored_password = decrypt(stored_encrypted_password, encryption_key)
+
+                # Get the entered password from the form
+                entered_password = request.form["admin_password"]
+
+                if stored_password == entered_password:
+                    # Username and password match, it's a successful login
                     session["admin_username"] = username
                     session["role"] = "admin"
                     return redirect(url_for("adminLanding"))
