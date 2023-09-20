@@ -5,6 +5,7 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from config import *
 from werkzeug.utils import secure_filename
+import bcrypt
 
 app = Flask(__name__, static_folder="static")
 app.secret_key = "123456"
@@ -186,11 +187,14 @@ def admin_signup():
         admin_username = request.form["admin_username"]
         admin_password = request.form["admin_password"]
 
+        # Hash the password
+        hashed_password = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
+
         insert_sql = "INSERT INTO Admin (admin_name, admin_username, admin_password) VALUES (%s, %s, %s)"
         cursor = db_conn.cursor()
 
         try:
-            cursor.execute(insert_sql, (admin_name, admin_username, admin_password))
+            cursor.execute(insert_sql, (admin_name, admin_username, hashed_password))
             db_conn.commit()
 
             return render_template("signup_success.html", name=admin_name)
@@ -239,18 +243,35 @@ def login():
                 session["lecturer_id"] = username
                 session["role"] = "lecturer"
                 return redirect(url_for("lecturer_dashboard"))
-
+            
         elif role == "admin":
             cursor.execute(
-                "SELECT * FROM Admin WHERE admin_username = %s AND admin_password = %s",
-                (username, password)
+                "SELECT * FROM Admin WHERE admin_username = %s",
+                (username,)
             )
             admin = cursor.fetchone()
-
+            
             if admin:
-                session["admin_username"] = username
-                session["role"] = "admin"
-                return redirect(url_for("adminLanding"))
+                hashed_password_from_db = admin["admin_password"]  # Assuming the column name is "admin_password"
+
+                # Check if the entered password matches the hashed password from the database
+                if bcrypt.checkpw(password.encode('utf-8'), hashed_password_from_db.encode('utf-8')):
+                    # Passwords match, so it's a successful login
+                    session["admin_username"] = username
+                    session["role"] = "admin"
+                    return redirect(url_for("adminLanding"))
+
+        # elif role == "admin":
+        #     cursor.execute(
+        #         "SELECT * FROM Admin WHERE admin_username = %s AND admin_password = %s",
+        #         (username, password)
+        #     )
+        #     admin = cursor.fetchone()
+
+        #     if admin:
+        #         session["admin_username"] = username
+        #         session["role"] = "admin"
+        #         return redirect(url_for("adminLanding"))
 
         cursor.close()
 
