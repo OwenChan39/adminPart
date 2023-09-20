@@ -260,7 +260,7 @@ def login():
             encryption_key = 42
             cursor.execute(
                 "SELECT admin_username, admin_password FROM Admin WHERE admin_username = %s",
-                (username,)
+                (username)
             )
             result = cursor.fetchone()
 
@@ -270,10 +270,7 @@ def login():
                 # Decrypt the stored encrypted password
                 stored_password = decrypt(stored_encrypted_password, encryption_key)
 
-                # Get the entered password from the form
-                entered_password = request.form["admin_password"]
-
-                if stored_password == entered_password:
+                if stored_password == password:
                     # Username and password match, it's a successful login
                     session["admin_username"] = username
                     session["role"] = "admin"
